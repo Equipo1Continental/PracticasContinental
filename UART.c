@@ -24,7 +24,10 @@
 /*----------------------------------------------------------------------------*/
 /*  2.0      | 24/04/2014  | Add functions start() and 	   | Isaac Ávila      */
 /* 			 |			   | stop(), modify init() for     |                  */
-/*			 |             | autocalculate BR registers    |                  */	
+/*			 |             | autocalculate BR registers    |                  */
+/*----------------------------------------------------------------------------*/
+/*  3.0      | 25/04/2014  | Use naming convention on      | Isaac Ávila      */
+/* 						   | variables		               |                  */
 /*============================================================================*/
 
 /* Includes */
@@ -35,6 +38,7 @@
 
 /* Functions macros, constants, types and datas         */
 /* ---------------------------------------------------- */
+volatile T_UBYTE rub_UART_String[UART_STRING_LENGTH];
 
 /* Functions macros */
 
@@ -68,128 +72,124 @@
  *  Name                 :	UART0_Init
  *  Description          :	This function initializes UART0 drivers
  *							and calculate BR y OSR registers according to baud rate 
- *							establish (9,600bps) . At the end of this function, 
- *                          the UART0 module is started.
- *                          
- *  Parameters           :  None
+ *							desired. At the end of this function, the UART0 module is 
+ *							Started.
+ *  Parameters           :  
+ *  						bd_value : Baud Rate desired for UART communication
+ *  						
  *  Return               :	None
  *  Critical/explanation :  No
  **************************************************************/
-void UART0_Init (T_ULONG bd_value)
+
+PUBLIC_FCT void UART0_Init (T_ULONG bd_value)
 {
-	T_ULONG baud_rate = 0;					//Variable to store baud rate
-	T_ULONG br_value = 0;					//Variable to store BD dividers
-	float br_float = 0;						//Auxiliar variable to save the result of division
-	float residue = 0;						//Variable to store the minimun residue
-	T_UBYTE temp = 4;						//Auxiliar Variable
-	T_UWORD osr_value = 4;					//Variable to store OSR dividers
-	const T_ULONG mcg_clk_hz = 21000000;	//FEI mode Frequency to UART0
-	T_UBYTE i = 0;							//Auxiliar Variable
+	const T_ULONG cul_mcg_clk_hz = 24000000;	//PLL/2 Source Clock for UART 
 	
-	PORTA_PCR1 = PORT_PCR_MUX(2);       //Enable the UART_TXD function on PTA1 
-	PORTA_PCR2 = PORT_PCR_MUX(2);       //Enable the UART_TXD function on PTA2
+	T_ULONG lul_baud_rate = 0;					//Variable to store baud rate
+	T_ULONG lul_br_value = 0;					//Variable to store BD dividers
+	float lf_br_float = 0;						//Auxiliary variable to save the result of division
+	float lf_residue = 0;						//Variable to store the minimum residue
+	T_UBYTE lub_temp = 4;						//Auxiliary Variable
+	T_UWORD luw_osr_value = 4;					//Variable to store OSR dividers
+	register T_UBYTE lub_i = 0;					//Auxiliary Variable
 	
-	SIM_SOPT2 |= SIM_SOPT2_UART0SRC(1); //Select the PLLFLLCLK as UART0 clock source 	 
 	
-	SIM_SCGC4 |= SIM_SCGC4_UART0_MASK;  //Enable Clock signal for UART0 
-  
-	UART0_Stop();		//Disable UART0 before changing registers
+	PORTA_PCR1 = PORT_PCR_MUX(2);			//Enable the UART_TXD function on PTA1 
+	PORTA_PCR2 = PORT_PCR_MUX(2);			//Enable the UART_TXD function on PTA2 
 	
-	baud_rate = bd_value;	//Baud rate desired	
+	SIM_SOPT2 |= SIM_SOPT2_UART0SRC(1); 	//Select the PLLFLLCLK as UART0 clock source	 
+	 
+	SIM_SCGC4 |= SIM_SCGC4_UART0_MASK;		//Enable Clock signal for UART0 
+	
+	UART0_Stop();							//Disable UART0 before changing registers
+	
+	lul_baud_rate = bd_value;				//Store Baud rate desired
 	
 	/*
 	 * Calculate BR registers depends on Baud Rate = Baud Clock / (BR * (OSR + 1)) according to datasheet
 	 */
-	br_value = mcg_clk_hz / (baud_rate * (osr_value + 1));
-	br_float = (float)mcg_clk_hz / ((float)baud_rate * ((float)osr_value + 1));
-	residue = br_float - (float)br_value;
+	lul_br_value = cul_mcg_clk_hz / (lul_baud_rate * (luw_osr_value + 1));
+	lf_br_float = (float)cul_mcg_clk_hz / ((float)lul_baud_rate * ((float)luw_osr_value + 1));
+	lf_residue = lf_br_float - (float)lul_br_value;
 	
 	/*
 	 * Calculate it for all OSR possible values to find the minimum error
 	 */
-	for(i=5; i<=32;i++)
+	for(lub_i = 5; lub_i <= 32; lub_i++)
 	{
-		br_value = mcg_clk_hz / (baud_rate * (i + 1));
-		br_float = (float)mcg_clk_hz / ((float)baud_rate * ((float)i + 1));
-		br_float -= (float)br_value;
-		if(br_float < residue)		//If a new "minimum error" is found
+		lul_br_value = cul_mcg_clk_hz / (lul_baud_rate * (lub_i + 1));
+		lf_br_float = (float)cul_mcg_clk_hz / ((float)lul_baud_rate * ((float)lub_i + 1));
+		lf_br_float -= (float)lul_br_value;
+		if(lf_br_float <= lf_residue)		//If a new "minimum error" is found
 		{
-			residue = br_float;		//Store new minimum error
-			temp = i;				//Store OSR value for this minimum error
+			lf_residue = lf_br_float;		//Store new minimum error
+			lub_temp = lub_i;				//Store OSR value for this minimum error
 		}
 	}
 	
-	osr_value = temp;				//Assign the OSR value founded to calculate the minimum error
-	br_value = mcg_clk_hz / (baud_rate * (osr_value + 1));	//Calculate BR value
+	luw_osr_value = lub_temp;				//Assign the found OSR value to calculate the minimum error
+	lul_br_value = cul_mcg_clk_hz / (lul_baud_rate * (luw_osr_value + 1));	//Calculate BR value
 	
-	UART0_BDH |= UART0_BDH_SBR(((br_value & 0x1F00) >> 8)); //Setting BD dividers
-	UART0_BDL = (T_UBYTE)(br_value & UART0_BDL_SBR_MASK);   //Setting BD dividers
-
-	UART0_C4 = UART0_C4_OSR(osr_value);                     //Setting OSR for Sampling Ratio
+	UART0_BDH |= UART0_BDH_SBR(((lul_br_value & 0x1F00) >> 8));	//Setting BD dividers
+	UART0_BDL = (T_UBYTE)(lul_br_value & UART0_BDL_SBR_MASK);	//Setting BD dividers
 	
-	/*
-	 * If Sampling Ratio is less than 8
-	 */
-	if(osr_value < 8)
+	UART0_C4 = UART0_C4_OSR(luw_osr_value);		//Setting OSR for Sampling Ratio
+	
+	if(luw_osr_value < 8)						//If Sampling Ratio is less than 8
 	{
-		/*
-		 * Enable both edges of baud clock for receiving data
-		 */
-		UART0_C5|= UART0_C5_BOTHEDGE_MASK;	
+		UART0_C5|= UART0_C5_BOTHEDGE_MASK;		//Enable both edges of baud clock for receiving data
 	}
 	else
 	{
 		
 	}
 	
-	UART0_C1 &=~(UART0_C1_M_MASK | UART0_C1_PE_MASK);       //8 Bit for data, No parity Selected
-	  
-	UART0_BDH &= ~(UART0_BDH_SBNS_MASK);                    //Configure One Stop Bit: 0 One stop bit.
+	UART0_C1 &=~(UART0_C1_M_MASK | UART0_C1_PE_MASK);	//8 Bit for data, No parity Selected
 	
-	/*
-	 * Enable receiver and transmitter
-	 */
-	UART0_Start();
+	UART0_BDH &= ~(UART0_BDH_SBNS_MASK);				//Configure One Stop Bit: 0 One stop bit.
+	
+	UART0_Start();			//Enable receiver and transmitter
 }
 
 /**************************************************************
  *  Name                 :	UART0_Start
- *  Description          :	Enables UART0's Receiver and Transmitter  
- *  Parameters           :      None
+ *  Description          :	Enable Receiver and Transmitter  
+ *  Parameters           :  None
  *  Return               :	None
  *  Critical/explanation :  No
  **************************************************************/
-void UART0_Start()
+PUBLIC_FCT void UART0_Start(void)
 {
-	UART0_C2 |= (UART0_C2_TE_MASK | UART0_C2_RE_MASK );	//Enable receiver and transmitter	
+	UART0_C2 |= (UART0_C2_TE_MASK | UART0_C2_RE_MASK );		//Enable receiver and transmitter
 }
 
 /**************************************************************
  *  Name                 :	UART0_Stop
- *  Description          :	Enables UART0's Receiver and Transmitter  
- *  Parameters           :      None
+ *  Description          :	Disable Receiver and Transmitter after buffer is empty 
+ *  Parameters           :  None
  *  Return               :	None
  *  Critical/explanation :  No
  **************************************************************/
-void UART0_Stop()
+PUBLIC_FCT void UART0_Stop(void)
 {
-	UART0_C2 &= ~(UART0_C2_TE_MASK | UART0_C2_RE_MASK);	//Disable transmitter and Receiver	
+	while(!(UART0_S1 & UART0_S1_TDRE_MASK));				//Wait until buffer is empty 
+	UART0_C2 &= ~(UART0_C2_TE_MASK | UART0_C2_RE_MASK);		//Disable transmitter and Receiver
 }
+
 
 /**************************************************************
  *  Name                 :	UART0_SendChar
  *  Description          :	Send a character through UART0  
  *  Parameters           :  
- *  						T_UBYTE ch: The character to be sent
+ *  						T_SBYTE lub_character: The character to be sent
  *  						
  *  Return               :	None
  *  Critical/explanation :  No
  **************************************************************/
-void UART0_SendChar(T_UBYTE ch)
+PUBLIC_FCT void UART0_SendChar(T_UBYTE lub_character)
 {
-      while(!(UART0_S1 & UART0_S1_TDRE_MASK));  //Wait until space is available in the FIFO 
-    
-      UART0_D = (T_UBYTE)ch;              		//Send the character  
+	while(!(UART0_S1 & UART0_S1_TDRE_MASK));	//Wait until buffer is empty 
+	UART0_D = (T_UBYTE)lub_character;  			//Send the character 
 }
 
 
@@ -197,19 +197,20 @@ void UART0_SendChar(T_UBYTE ch)
  *  Name                 :	UART0_Write
  *  Description          :	Send a string through UART0  
  *  Parameters           :  
- *  						T_UBYTE *ptr: The string to be sent
+ *  						T_SBYTE *lpub_ptr: The string to be sent
  *  						
  *  Return               :	None
  *  Critical/explanation :  No
  **************************************************************/
-void UART0_Write(T_UBYTE *ptr)
+PUBLIC_FCT void UART0_Write(PTR_UBYTE lpub_ptr)
 {
-	while(*ptr)
+	while(*lpub_ptr)				//While string isn't end		
 	{
-		UART0_SendChar(*ptr);
-		ptr++;
+		UART0_SendChar(*lpub_ptr);	//Send every character of the string	
+		lpub_ptr++;					//Point to next character
 	}
 }
+
 
 /**************************************************************
  *  Name                 :	UART0_GetChar
@@ -220,10 +221,59 @@ void UART0_Write(T_UBYTE *ptr)
  *                          T_UBYTE UART0_D : Received data from UART0
  *  Critical/explanation :  No
  **************************************************************/
-
-T_UBYTE UART0_GetChar(void)
+PUBLIC_FCT T_UBYTE UART0_GetChar(void)
 {
-      while (!(UART0_S1 & UART0_S1_RDRF_MASK));		//Wait until character has been received
-    
-      return UART0_D;   							//Return the 8-bit data from the receiver
+	T_UBYTE lub_readData = 0;
+	//while (!(UART0_S1 & UART0_S1_RDRF_MASK));	//Wait until character has been received 
+	if(UART0_S1 & UART0_S1_RDRF_MASK)
+	{
+		lub_readData &= 0;
+		lub_readData |= UART0_D;
+	}
+	else
+	{
+		
+	}
+	
+    return lub_readData;								//Return the 8-bit data from the receiver
+}
+
+/**************************************************************
+ *  Name                 :	UART0_GetString
+ *  Description          :	Receive a string through UART0 and
+ *  						store it in array rub_UART_String. 
+ *  						Print the string read character by
+ *  						character (echo).
+ *  						
+ *  Parameters           :  None
+ *  						
+ *  Return               :	
+ *                          T_UBYTE *rub_UART_String : Locality of array where the string was stored
+ *                          
+ *  Critical/explanation :  No
+ **************************************************************/
+PUBLIC_FCT PTR_UBYTE UART0_GetString(void)
+{
+	T_UBYTE lub_Data = 0;						//Temporarily variable to every character
+	T_BOOLEAN lbi_StringComplete = FALSE;		//Flag to indicate finished reading
+	T_UBYTE lub_index = 0;
+
+	while(!lbi_StringComplete)
+	{
+		lub_Data = UART0_GetChar();					//Read character
+		if((lub_Data != '\r') && (lub_Data != 0))
+		{
+			rub_UART_String[lub_index] = lub_Data;	//Store read character
+			lub_index++;							//Point to next location
+			UART0_SendChar(lub_Data);				//Echo data
+		}	
+		else
+		{
+			rub_UART_String[lub_index] = 0;			//Finish the string
+			UART0_SendChar(CR);						//Print escape sequence
+			UART0_SendChar(LF);						//Print escape sequence
+			lbi_StringComplete = TRUE;				//Finish the reading
+		}
+	}
+    return (PTR_UBYTE)rub_UART_String;				//Return the pointer where string is stored
 }
