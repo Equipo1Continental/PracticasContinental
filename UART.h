@@ -22,6 +22,10 @@
 /*  1.0      | 19/04/2014  | Add all functions for UART0   |   Isaac Avila	  */
 /* 						   | such as: Init, 			   |				  */
 /*  					   | SendChar, Write and GetChar   |                  */
+/*----------------------------------------------------------------------------*/
+/*  2.0      | 24/04/2014  | Add GetString function.       |   Isaac Avila	  */
+/* 						   | Modify UART0_GetChar changing |				  */
+/*  					   | while loop					   |                  */
 /*============================================================================*/
 
 #ifndef UART_H_			/* To avoid double inclusion */
@@ -63,16 +67,23 @@
 /* ---------------------------------------- */
 
 /* Functions prototypes */
-void UART0_Init (void);
+PUBLIC_FCT void UART0_Init (T_ULONG bd_value);
 
-void UART0_SendChar(T_UBYTE);
-void UART0_Write(T_UBYTE *);
+PUBLIC_FCT void UART0_Start(void);
+PUBLIC_FCT void UART0_Stop(void);
 
-T_UBYTE UART0_GetChar(void);
+PUBLIC_FCT void UART0_SendChar(T_UBYTE lub_character);
+PUBLIC_FCT void UART0_Write(PTR_UBYTE lpub_ptr);
 
+PUBLIC_FCT T_UBYTE UART0_GetChar(void);
+PUBLIC_FCT PTR_UBYTE UART0_GetString(void);
 
 /* Functions macros */
 
 /* Exported defines */
+#define UART_STRING_LENGTH 	32u		//Length of received string
+#define NewPage 			0x0C	//Command for sending a new page (clear screen)
+#define CR					0x0D	//Carriage Return (Return to the initial position)
+#define LF					0x0A	//Linefeed (New Line)
 
 #endif /* UART_H_ */
